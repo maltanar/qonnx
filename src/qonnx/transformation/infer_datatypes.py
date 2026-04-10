@@ -131,6 +131,15 @@ def _infer_node_datatype(model, node, allow_scaledint_dtypes):
             (bitwidth, signed, _) = extract_elem_type(ivi.type.tensor_type.elem_type)
             ret = DataType["SCALEDINT<%d>" % (bitwidth)]
             model.set_tensor_datatype(node.output[0], ret)
+        elif node.op_type == "Abs":
+            # set output dtype = input dtype, but only if input is already a known non-float type
+            idtype = model.get_tensor_datatype(node.input[0])
+            ret = DataType["FLOAT32"]  # default to float32 if input type is unknown or already float
+            if idtype is not None and "FLOAT" not in idtype.name:
+                if idtype.is_integer():
+                    # if input is integer, output can be integer with same bitwidth but unsigned
+                    ret = DataType["UINT%d" % (idtype.bitwidth())]
+            model.set_tensor_datatype(node.output[0], ret)
         else:
             # unknown, assume node produces float32 outputs
             for o in node.output:

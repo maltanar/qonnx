@@ -65,6 +65,10 @@ def _find_invalid_nodes(model):
         "MaxPool",
         "Upsample",
         "Resize",
+        "Quant",
+        "Log",
+        "Abs",
+        "AveragePool",
     ]
     invalid_nodes = []
     for n in model.graph.node:
