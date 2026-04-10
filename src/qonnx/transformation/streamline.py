@@ -26,6 +26,9 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import dataclasses
+import json
+
 import numpy as np
 from functools import partial
 from onnx import TensorProto, helper
@@ -104,6 +107,17 @@ class Streamline(Transformation):
 
         return model, False
 
+class EnhancedJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if dataclasses.is_dataclass(obj):
+            return dataclasses.asdict(obj)
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
 
 class StreamlineFromRangeDict(Transformation):
     """
@@ -122,6 +136,10 @@ class StreamlineFromRangeDict(Transformation):
         tensor_list = list(filter(tensor_filter, model.get_all_tensor_names()))
         if self.include_toplevel_outs:
             tensor_list += [x.name for x in model.graph.output]
+        print("List of tensors:" + ", ".join(tensor_list))
+        model.save("dbg-streamline.onnx")
+        with open("range_analysis.json", "w") as f:
+            json.dump(self.scaledint_range_dict, f, indent=2, cls=EnhancedJSONEncoder)
         for tensor_name in tensor_list:
             model = model.transform(ExtractAggregateScaleBias(self.scaledint_range_dict, tensor_name))
         return model, False
