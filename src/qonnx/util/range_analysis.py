@@ -296,6 +296,15 @@ def calc_logsoftmax_range(node, model, range_dict):
     # Note: Replaces -inf by the smallest representable float 32 value
     range_dict[oname].range = (DataType["FLOAT32"].min(), 0)
 
+def calc_abs_range(node, model, range_dict):
+    oname = node.output[0]
+    assert node.op_type == "Abs"
+    irange = range_dict[node.input[0]].range
+
+    range_dict[oname].range = (
+        np.where((irange[0] <= 0) & (irange[1] >= 0), 0, np.minimum(np.abs(irange[0]), np.abs(irange[1]))),
+        np.maximum(np.abs(irange[0]), np.abs(irange[1]))
+    )
 
 # return whether a given tensor is a shape operand
 def is_shape_operand(tensor_name, model):
@@ -467,6 +476,30 @@ def calc_intrange_relu(node, model, range_dict):
     range_dict[node.output[0]].history_scale = []
     range_dict[node.output[0]].history_bias = []
 
+def calc_intrange_abs(node, model, range_dict):
+    inp_int_info = check_int_inputs(node, range_dict)
+    if not any(inp_int_info):
+        # must have at least one input with integer info, otherwise no point
+        warn(node.name + " has no integer info on inputs, cannot propagate")
+        range_dict[node.output[0]].history_scale = []
+        range_dict[node.output[0]].history_bias = []
+        return
+    
+    irange_inf = range_dict[node.input[0]]
+    if (irange_inf.scale >= 0).all() and (irange_inf.bias == 0).all():
+        # propagate scale and bias as-is
+        range_dict[node.output[0]].scale = irange_inf.scale
+        range_dict[node.output[0]].bias = irange_inf.bias
+        # compute integer ranges from full precision ranges using scale/bias
+        calc_intrange_from_scalebias(node, model, range_dict)
+        # propagate scale history as-is
+        range_dict[node.output[0]].history_scale = irange_inf.history_scale
+        range_dict[node.output[0]].history_bias = irange_inf.history_bias
+    else:
+        # stop integer range propagation
+        range_dict[node.output[0]].history_scale = []
+        range_dict[node.output[0]].history_bias = []
+    
 
 def get_point_interval(input_name, range_dict):
     if input_name not in range_dict:
@@ -796,6 +829,8 @@ def calc_intrange_matmul(node, model, range_dict):
         # new bias is (bias_0 @ (scale_1 * input_1))
         # where @ is MatMul
         bias = np.broadcast_to(irange_0_inf.bias, irange_0_inf.shape) @ (irange_1_inf.scale * irange_1_inf.int_range[0])
+    elif i0_bias_ok and i1_bias_ok:
+        bias = np.asarray(0, dtype=ra_dtype)
     else:
         assert False, f"Unhandled bias condition in {node.name}"
     range_dict[node.output[0]].scale = scale
@@ -914,6 +949,9 @@ def calc_intrange_conv(node, model, range_dict):
         }
         execute_node(node, node_ctx, model.graph)
         bias = node_ctx[node.output[0]]
+    elif i0_bias_ok and i1_bias_ok:
+        # both biases are zero, so the output bias is also zero
+        bias = np.asarray(0, dtype=ra_dtype)
     else:
         assert False, f"Unhandled bias condition in {node.name}"
     range_dict[node.output[0]].scale = scale
@@ -1094,6 +1132,7 @@ optype_to_range_calc = {
     "Ceil": calc_monotonic_range,
     "Round": calc_monotonic_range,
     "Sign": calc_monotonic_range,
+    "Abs": calc_abs_range,
     # Softmax has a defined output range of [0,1] while LogSoftmax yields the
     # log of this range
     "Softmax": calc_softmax_range,
@@ -1122,6 +1161,7 @@ optype_to_intrange_calc = {
     "MaxPool": calc_intrange_eltwise_monotonic,
     "Im2Col": calc_intrange_eltwise_monotonic,
     "Concat": calc_intrange_eltwise_monotonic,
+    "Abs": calc_intrange_abs,
     # TODO: Workaround for some weird RA behavior producing NANs, zero scales or
     #  ranges from -0 to +0. So far only observed in rather complex topology
     #  involving residual connections, attention and novel activation functions
