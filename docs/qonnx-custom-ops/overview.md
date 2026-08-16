@@ -11,3 +11,9 @@ It is manually updated, since QONNX custom operators are relatively few in numbe
 |[FloatQuant](floatquant_v1.md)      | [1](floatquant_v1.md)||
 |[IntQuant](intquant_v1.md)          | [1](intquant_v1.md)||
 |[Trunc](trunc_v2.md)                | [2](trunc_v2.md), [1](trunc_v1.md)||
+
+### qonnx.custom_op.lnn
+
+|**Operator**|**Since version**||
+|-|-|-|
+|[LookupTable](lookuptable_v1.md)    | [1](lookuptable_v1.md)||
