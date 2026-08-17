@@ -16,4 +16,4 @@ It is manually updated, since QONNX custom operators are relatively few in numbe
 
 |**Operator**|**Since version**||
 |-|-|-|
-|[LookupTable](lookuptable_v1.md)    | [1](lookuptable_v1.md)||
+|[LookupTable](lookuptable_v3.md)    | [3](lookuptable_v3.md)||
