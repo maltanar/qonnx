@@ -27,5 +27,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from qonnx.custom_op.lnn.lookup_table import LookupTable
+from qonnx.custom_op.lnn.lookup_table_conv import LookupTableConv
 
-__all__ = ["LookupTable"]
+__all__ = ["LookupTable", "LookupTableConv"]
