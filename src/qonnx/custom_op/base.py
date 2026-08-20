@@ -31,7 +31,7 @@ import onnx.helper as helper
 import onnx.numpy_helper as np_helper
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Sequence, cast
+from typing import TYPE_CHECKING, Optional, Sequence, cast
 
 import numpy.typing as npt
 from onnx import NodeProto, GraphProto, TensorProto
@@ -276,9 +276,12 @@ class CustomOp(ABC):
         pass
 
     @abstractmethod
-    def make_shape_compatible_op(self, model: "ModelWrapper") -> NodeProto:
+    def make_shape_compatible_op(self, model: "ModelWrapper") -> Optional[NodeProto]:
         """Returns a standard ONNX op which is compatible with this CustomOp
-        for performing shape inference."""
+        for performing shape inference. May return None if the shape(s) of this
+        node's input(s) are not yet resolvable (e.g. produced by another custom
+        op earlier in the graph that hasn't been resolved yet); InferShapes
+        retries such nodes on a later iteration once upstream shapes are known."""
         pass
 
     @abstractmethod
