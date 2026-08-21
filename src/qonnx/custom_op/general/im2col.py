@@ -27,6 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
+from onnx import TensorProto
 
 import qonnx.util.basic as util
 from qonnx.core.datatype import DataType
@@ -185,7 +186,15 @@ class Im2Col(CustomOp):
         ofm_dim_h = compute_conv_output_dim(ifm_dim_h, k_h, stride_h, pad_h, dilation_h)
         ofm_dim_w = compute_conv_output_dim(ifm_dim_w, k_w, stride_w, pad_w, dilation_w)
 
-        return super().make_const_shape_op([1, ofm_dim_h, ofm_dim_w, k_h * k_w * ifm_ch])
+        # the output may already have a declared ValueInfo (with a real elem_type)
+        # from an earlier transformation; the shape-compatible op's declared dtype
+        # must match it, or ONNX shape inference silently refuses to propagate shape
+        out_vi = model.get_tensor_valueinfo(self.onnx_node.output[0])
+        out_dtype = out_vi.type.tensor_type.elem_type if out_vi is not None else TensorProto.FLOAT
+
+        return super().make_const_shape_op(
+            [1, ofm_dim_h, ofm_dim_w, k_h * k_w * ifm_ch], out_dtype
+        )
 
     def infer_node_datatype(self, model):
         node = self.onnx_node
