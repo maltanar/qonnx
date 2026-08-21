@@ -241,16 +241,21 @@ class CustomOp(ABC):
         except KeyError:
             raise AttributeError("Op has no such attribute: " + name)
 
-    def make_const_shape_op(self, shape: Sequence[int] | npt.NDArray) -> NodeProto:
+    def make_const_shape_op(
+        self, shape: Sequence[int] | npt.NDArray, dtype: int = TensorProto.FLOAT
+    ) -> NodeProto:
         """Return an ONNX node that generates the desired output shape for
-        shape inference."""
+        shape inference. dtype is the ONNX TensorProto elem_type to declare for the
+        RandomNormal output; it must match any ValueInfo already declared elsewhere
+        for this node's output, or ONNX shape inference silently refuses to
+        propagate the shape due to the resulting type mismatch."""
         return helper.make_node(
             "RandomNormal",
             inputs=[],
             outputs=[self.onnx_node.output[0]],
             mean=0.0,
             scale=1.0,
-            dtype=1,
+            dtype=dtype,
             shape=list(shape),
         )
 
