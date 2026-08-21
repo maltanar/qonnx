@@ -87,7 +87,10 @@ class LookupTable(CustomOp):
         node = self.onnx_node
         ishape = model.get_tensor_shape(node.input[0])
         idx_shape = model.get_tensor_shape(node.input[1], fix_missing_init_shape=True)
-        if ishape is None or idx_shape is None or len(idx_shape) != 2:
+        # get_tensor_shape returns [] both for a genuinely unknown/unresolved shape
+        # (e.g. a pre-declared ValueInfo with only elem_type set) and for a true
+        # rank-0 tensor; only the latter is possible here, so treat [] as unresolved
+        if ishape is None or not ishape or idx_shape is None or len(idx_shape) != 2:
             # not resolvable yet, e.g. produced by another not-yet-hidden custom op;
             # InferShapes will retry this node on a later iteration
             return None
