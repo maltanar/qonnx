@@ -186,6 +186,14 @@ class Im2Col(CustomOp):
         ofm_dim_h = compute_conv_output_dim(ifm_dim_h, k_h, stride_h, pad_h, dilation_h)
         ofm_dim_w = compute_conv_output_dim(ifm_dim_w, k_w, stride_w, pad_w, dilation_w)
 
+        # input_shape is a static design-time attribute, so its batch dim can be stale
+        # (e.g. after ChangeBatchSize); prefer the model's current input shape instead
+        actual_ishape = model.get_tensor_shape(self.onnx_node.input[0])
+        if actual_ishape and len(actual_ishape) == 4 and actual_ishape[0]:
+            batch = actual_ishape[0]
+        else:
+            batch = ishape[0]
+
         # the output may already have a declared ValueInfo (with a real elem_type)
         # from an earlier transformation; the shape-compatible op's declared dtype
         # must match it, or ONNX shape inference silently refuses to propagate shape
@@ -193,7 +201,7 @@ class Im2Col(CustomOp):
         out_dtype = out_vi.type.tensor_type.elem_type if out_vi is not None else TensorProto.FLOAT
 
         return super().make_const_shape_op(
-            [1, ofm_dim_h, ofm_dim_w, k_h * k_w * ifm_ch], out_dtype
+            [batch, ofm_dim_h, ofm_dim_w, k_h * k_w * ifm_ch], out_dtype
         )
 
     def infer_node_datatype(self, model):
@@ -214,12 +222,14 @@ class Im2Col(CustomOp):
 
         iname = node.input[0]
         x = context[iname]
-        qnt_annotations = graph.quantization_annotation
-        ret = util.get_by_name(qnt_annotations, iname, "tensor_name")
-        ret = util.get_by_name(ret.quant_parameter_tensor_names, "finn_datatype", "key")
-        idt = DataType[ret.value]
         if pad != [0, 0, 0, 0]:
-            assert idt.allowed(pad_val), "Im2Col dtype must allow pad_val"
+            qnt_annotations = graph.quantization_annotation
+            ret = util.get_by_name(qnt_annotations, iname, "tensor_name")
+            if ret is not None:
+                ret = util.get_by_name(ret.quant_parameter_tensor_names, "finn_datatype", "key")
+            if ret is not None:
+                idt = DataType[ret.value]
+                assert idt.allowed(pad_val), "Im2Col dtype must allow pad_val"
         # check that input is NHWC
         assert x.ndim == 4, "Unexpected number of input dims for Im2Col"
         n, h, w, c = x.shape
