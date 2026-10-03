@@ -27,6 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
+import pytest
 from onnx import TensorProto, helper
 
 import qonnx.core.onnx_exec as oxe
@@ -53,7 +54,7 @@ def _ofm_dims(x_shape, kernel_shape, strides, pads):
     ]
 
 
-def make_conv_model(x_shape, indices, table, tree_depth, kernel_shape, strides, pads):
+def make_conv_model(x_shape, indices, table, tree_depth, kernel_shape, strides, pads, input_bits=1):
     """table may be None (passthrough, tree_depth == 0 -> only X, indices as inputs)."""
     m, lut_rank = indices.shape[0], indices.shape[-1]
     ofm_dims = _ofm_dims(x_shape, kernel_shape, strides, pads)
@@ -81,6 +82,7 @@ def make_conv_model(x_shape, indices, table, tree_depth, kernel_shape, strides, 
         ["Y"],
         domain=DOMAIN,
         tree_depth=tree_depth,
+        input_bits=input_bits,
         kernel_shape=kernel_shape,
         strides=strides,
         pads=pads,
@@ -123,6 +125,15 @@ def test_lower_tree_depth1():
 
     produced = oxe.execute_onnx(model, {"X": x})["Y"]
     assert np.array_equal(produced, expected)
+
+
+def test_lower_rejects_non_binary_input_bits():
+    indices = np.array([[[0, 3]]], dtype=np.int64)
+    table = np.array([[[0, 1, 1, 0]]], dtype=np.uint8)
+    model = make_conv_model((1, 2, 2, 1), indices, table, 1, [2, 2], [2, 2], [0, 0, 0, 0], input_bits=2)
+
+    with pytest.raises(AssertionError, match="only supports input_bits=1"):
+        model.transform(LowerLookupTableConvToLookupTable())
 
 
 def test_lower_preserves_out_bits_for_lookup_nodes():

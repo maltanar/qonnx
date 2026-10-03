@@ -72,12 +72,15 @@ class LowerLookupTableConvToLookupTable(Transformation):
         tree_depth = tree_depth_attr.i if tree_depth_attr is not None else 1
         out_bits_attr = get_by_name(node.attribute, "out_bits")
         out_bits = out_bits_attr.i if out_bits_attr is not None else 0
+        input_bits_attr = get_by_name(node.attribute, "input_bits")
+        input_bits = input_bits_attr.i if input_bits_attr is not None else 1
         kernel_shape = list(get_by_name(node.attribute, "kernel_shape").ints)
         strides_attr = get_by_name(node.attribute, "strides")
         strides = list(strides_attr.ints) if strides_attr is not None else [1] * len(kernel_shape)
         pads_attr = get_by_name(node.attribute, "pads")
         pads = list(pads_attr.ints) if pads_attr is not None else [0] * (2 * len(kernel_shape))
 
+        assert input_bits == 1, "LowerLookupTableConvToLookupTable only supports input_bits=1"
         assert len(kernel_shape) == 2, "LowerLookupTableConvToLookupTable only supports 2D LookupTableConv"
 
         indices = model.get_initializer(idx_name)
