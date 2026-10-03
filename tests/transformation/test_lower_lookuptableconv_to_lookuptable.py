@@ -36,7 +36,7 @@ from qonnx.custom_op.lnn.lookup_table_conv import lookup_table_conv
 from qonnx.transformation.infer_datatypes import InferDataTypes
 from qonnx.transformation.infer_shapes import InferShapes
 from qonnx.transformation.lower_lookuptableconv_to_lookuptable import LowerLookupTableConvToLookupTable
-from qonnx.util.basic import qonnx_make_model
+from qonnx.util.basic import get_by_name, qonnx_make_model
 
 DOMAIN = "qonnx.custom_op.lnn"
 
@@ -123,6 +123,24 @@ def test_lower_tree_depth1():
 
     produced = oxe.execute_onnx(model, {"X": x})["Y"]
     assert np.array_equal(produced, expected)
+
+
+def test_lower_preserves_out_bits_for_lookup_nodes():
+    rng = np.random.default_rng(4)
+    indices = rng.integers(0, 4, size=(2, 1, 2), dtype=np.int64)
+    table = rng.integers(0, 2, size=(2, 1, 4), dtype=np.uint8)
+    model = make_conv_model(
+        (1, 2, 2, 1), indices, table, 1, [2, 2], [2, 2], [0, 0, 0, 0]
+    )
+    model.graph.node[0].attribute.append(helper.make_attribute("out_bits", 1))
+
+    model = model.transform(LowerLookupTableConvToLookupTable())
+    lookup_nodes = [node for node in model.graph.node if node.op_type == "LookupTable"]
+
+    assert len(lookup_nodes) == 1
+    assert get_by_name(lookup_nodes[0].attribute, "out_bits").i == 1
+    model = model.transform(InferShapes()).transform(InferDataTypes())
+    assert model.get_tensor_datatype("Y") == DataType["BINARY"]
 
 
 def test_lower_tree_depth2_no_kernel_crosstalk():

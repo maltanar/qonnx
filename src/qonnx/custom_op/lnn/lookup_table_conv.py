@@ -96,6 +96,7 @@ class LookupTableConv(CustomOp):
     def get_nodeattr_types(self):
         return {
             "tree_depth": ("i", False, 1),
+            "out_bits": ("i", False, 0),
             "kernel_shape": ("ints", True, []),
             "strides": ("ints", False, []),
             "pads": ("ints", False, []),
@@ -151,6 +152,8 @@ class LookupTableConv(CustomOp):
         elem_type = _get_table_elem_type(model, node.input[2])
         assert elem_type in _TABLE_ELEM_TYPE_INFO, "Unsupported table dtype for LookupTableConv"
         bits, signed = _TABLE_ELEM_TYPE_INFO[elem_type]
+        out_bits = self.get_nodeattr("out_bits")
+        bits = out_bits if out_bits > 0 else bits
         if bits == 1 and not signed:
             odt = DataType["BINARY"]
         else:

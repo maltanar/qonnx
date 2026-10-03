@@ -70,6 +70,8 @@ class LowerLookupTableConvToLookupTable(Transformation):
 
         tree_depth_attr = get_by_name(node.attribute, "tree_depth")
         tree_depth = tree_depth_attr.i if tree_depth_attr is not None else 1
+        out_bits_attr = get_by_name(node.attribute, "out_bits")
+        out_bits = out_bits_attr.i if out_bits_attr is not None else 0
         kernel_shape = list(get_by_name(node.attribute, "kernel_shape").ints)
         strides_attr = get_by_name(node.attribute, "strides")
         strides = list(strides_attr.ints) if strides_attr is not None else [1] * len(kernel_shape)
@@ -151,6 +153,7 @@ class LowerLookupTableConvToLookupTable(Transformation):
                         [out_name],
                         domain=LNN_DOMAIN,
                         input_bits=1,
+                        out_bits=out_bits,
                     )
                 )
                 hidden = out_name

@@ -116,6 +116,25 @@ def test_execute_single_level():
     assert np.array_equal(produced, expected)
 
 
+def test_out_bits_controls_output_datatype():
+    indices = np.array([[[0, 1]]], dtype=np.int64)
+    table = np.array([[[0, 1, 1, 0]]], dtype=np.uint8)
+    model = make_conv_model(
+        (1, 2, 2, 1),
+        TensorProto.UINT8,
+        indices,
+        table,
+        1,
+        [2, 2],
+        [2, 2],
+        [0, 0, 0, 0],
+    )
+    model.graph.node[0].attribute.append(helper.make_attribute("out_bits", 1))
+    model = model.transform(InferShapes()).transform(InferDataTypes())
+
+    assert model.get_tensor_datatype("Y") == DataType["BINARY"]
+
+
 def test_execute_tree_depth2():
     """Depth-2 tree of 2-input gates: two leaf gates feed a root gate, over a 2x2 receptive field."""
     indices = np.array([[[0, 3], [1, 2]]], dtype=np.int64)  # (M=1, P=2, lut_rank=2)
